@@ -1,0 +1,5 @@
+FROM node:22-alpine
+WORKDIR /app
+COPY tests/fixtures/mock-mcp-http.js .
+EXPOSE 8080
+ENTRYPOINT ["node", "mock-mcp-http.js"]

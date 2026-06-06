@@ -1,0 +1,123 @@
+services:
+  # ─── Mock MCP Server ────────────────────────────────────────
+  mock-mcp:
+    build:
+      context: ../..
+      dockerfile: tests/fixtures/Dockerfile.mock-mcp
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  # ─── MCP Firewall ───────────────────────────────────────────
+  mcp-firewall:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    ports:
+      - "9020:9020"  # Proxy (HTTP mode)
+      - "9090:9090"  # Prometheus metrics
+      - "9021:9021"  # Dashboard
+    volumes:
+      - ./docker-firewall-config.yaml:/app/mcp-firewall.yaml:ro
+      - ../../test-data:/app/data
+    depends_on:
+      - mock-mcp
+      - jaeger
+    restart: unless-stopped
+
+  # ─── Traffic Generator ──────────────────────────────────────
+  traffic-gen:
+    image: node:22-alpine
+    command:
+      - sh
+      - -c
+      - |
+        sleep 5  # Wait for services to start
+        echo "=== Starting traffic generation ==="
+        # Initialize
+        for i in $$(seq 1 50); do
+          curl -s -X POST http://mcp-firewall:9020/ \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"id\":\"$$i-init\",\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"load-test\",\"version\":\"1.0\"}}}" > /dev/null || true
+        done
+
+        # Call echo tool
+        for i in $$(seq 1 80); do
+          curl -s -X POST http://mcp-firewall:9020/ \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"id\":\"$$i-echo\",\"method\":\"tools/call\",\"params\":{\"name\":\"echo\",\"arguments\":{\"message\":\"Hello $$i\"}}}" > /dev/null || true
+          sleep 0.05
+        done
+
+        # Call get_secret (triggers sensitive data detection)
+        for i in $$(seq 1 30); do
+          curl -s -X POST http://mcp-firewall:9020/ \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"id\":\"$$i-secret\",\"method\":\"tools/call\",\"params\":{\"name\":\"get_secret\",\"arguments\":{}}}" > /dev/null || true
+          sleep 0.1
+        done
+
+        # Trigger some blocked requests
+        for i in $$(seq 1 10); do
+          curl -s -X POST http://mcp-firewall:9020/ \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"id\":\"$$i-bad\",\"method\":\"dangerous/method\"}" > /dev/null || true
+        done
+
+        # Path traversal attempt
+        for i in $$(seq 1 5); do
+          curl -s -X POST http://mcp-firewall:9020/ \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"id\":\"$$i-traversal\",\"method\":\"tools/call\",\"params\":{\"name\":\"echo\",\"arguments\":{\"message\":\"../../../etc/passwd\"}}}" > /dev/null || true
+        done
+
+        echo "=== Traffic generation complete ==="
+        # Keep container alive for inspection
+        tail -f /dev/null
+    depends_on:
+      - mcp-firewall
+    restart: "no"
+
+  # ─── Prometheus ─────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v3.2.0
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+
+  # ─── Grafana ────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:11.6.0
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana-dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+  # ─── Jaeger ─────────────────────────────────────────────────
+  jaeger:
+    image: jaegertracing/all-in-one:1.66
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "4318:4318"    # OTLP HTTP receiver
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    restart: unless-stopped
+
+volumes:
+  prometheus_data:
+  grafana_data:

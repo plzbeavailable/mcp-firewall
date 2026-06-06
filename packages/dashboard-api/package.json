@@ -1,0 +1,35 @@
+{
+  "name": "@mcp-firewall/dashboard-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dashboard REST API for MCP Firewall — Hono-based",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean --sourcemap",
+    "dev": "tsup src/index.ts --format esm --dts --watch --sourcemap",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist .tsbuildinfo"
+  },
+  "dependencies": {
+    "@mcp-firewall/core": "workspace:*",
+    "@mcp-firewall/db": "workspace:*",
+    "hono": "^4.12.23"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.1.0"
+  }
+}

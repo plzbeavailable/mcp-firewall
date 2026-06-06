@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "filesystem-firewalled": {
+      "command": "node",
+      "args": [
+        "E:/hub/mcp-firewall/apps/proxy/dist/index.js",
+        "run",
+        "E:/hub/mcp-firewall/examples/claude-desktop-firewall.yaml"
+      ]
+    }
+  }
+}

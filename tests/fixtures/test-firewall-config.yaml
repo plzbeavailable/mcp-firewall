@@ -1,0 +1,90 @@
+# Test firewall configuration for integration tests
+# Uses the mock MCP server fixture
+
+version: "1"
+mode: stdio
+
+upstreams:
+  - name: mock-server
+    transport: stdio
+    command: node
+    args:
+      - "${MOCK_SERVER_PATH}"
+    env: {}
+    healthCheck:
+      enabled: false
+
+auth:
+  enabled: false
+
+policies:
+  method_allowlist:
+    enabled: true
+    allowed_methods:
+      - initialize
+      - ping
+      - tools/list
+      - tools/call
+      - resources/list
+      - resources/read
+      - prompts/list
+      - prompts/get
+    block_unknown: true
+
+  rbac:
+    enabled: true
+    rules:
+      - name: "block-write-tools"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "write_*"
+        permission: deny
+      - name: "allow-read-tools"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "*"
+        permission: allow
+
+  rate_limiting:
+    enabled: false
+
+  parameter_validation:
+    enabled: true
+    strict_mode: false
+
+  content_filter:
+    enabled: false
+
+  sensitive_data:
+    enabled: true
+    detectors:
+      - type: api-key
+        action: mask
+      - type: credit-card
+        action: mask
+
+observability:
+  metrics:
+    enabled: false
+  tracing:
+    enabled: false
+  audit_log:
+    enabled: true
+    output: stdout
+    format: jsonl
+  token_tracking:
+    enabled: false
+
+database:
+  type: sqlite
+  sqlite:
+    path: "./test-data/test.db"
+
+dashboard:
+  enabled: false

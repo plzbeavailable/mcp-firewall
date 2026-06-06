@@ -1,0 +1,30 @@
+{
+  "name": "@mcp-firewall/proxy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP Firewall CLI — the main entry point for running the firewall proxy",
+  "type": "module",
+  "bin": {
+    "mcp-firewall": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean --sourcemap",
+    "dev": "tsup src/index.ts --format esm --dts --watch --sourcemap",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist .tsbuildinfo"
+  },
+  "dependencies": {
+    "@mcp-firewall/core": "workspace:*",
+    "@mcp-firewall/config": "workspace:*",
+    "citty": "^0.1.6"
+  },
+  "devDependencies": {
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.1.0",
+    "@types/node": "^22.0.0"
+  }
+}

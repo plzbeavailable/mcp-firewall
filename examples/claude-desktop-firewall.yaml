@@ -1,0 +1,159 @@
+# MCP Firewall Configuration — Claude Desktop Integration Example
+#
+# This config proxies the MCP filesystem server through the firewall.
+# Place this in the same directory as claude_desktop_config.json.
+#
+# Usage:
+#   1. Make sure @modelcontextprotocol/server-filesystem is installed:
+#      npx @modelcontextprotocol/server-filesystem --help
+#
+#   2. Point claude_desktop_config.json to this firewall config:
+#      "filesystem-firewalled": {
+#        "command": "node",
+#        "args": ["<path-to>/apps/proxy/dist/index.js", "run", "<path-to>/examples/claude-desktop-firewall.yaml"]
+#      }
+#
+#   3. Restart Claude Desktop — the filesystem server is now firewalled.
+
+version: "1"
+mode: stdio
+
+# Proxy to the filesystem MCP server
+upstreams:
+  - name: filesystem
+    transport: stdio
+    command: npx
+    args:
+      - "-y"
+      - "@modelcontextprotocol/server-filesystem"
+      - "."  # Allow access to current directory (customize this!)
+    env: {}
+    healthCheck:
+      enabled: false
+
+# ─── Security ──────────────────────────────────────────────────
+policies:
+  method_allowlist:
+    enabled: true
+    allowed_methods:
+      - initialize
+      - ping
+      - tools/list
+      - tools/call
+      - resources/list
+      - resources/read
+      - prompts/list
+      - prompts/get
+    block_unknown: true
+
+  # RBAC: Block dangerous write operations by default
+  rbac:
+    enabled: true
+    rules:
+      - name: "allow-read-only"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "read_*"
+            serverName: "filesystem"
+        permission: allow
+      - name: "allow-list"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "list_*"
+            serverName: "filesystem"
+        permission: allow
+      - name: "block-writes"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "write_*"
+            serverName: "filesystem"
+        permission: deny
+      - name: "block-edits"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "edit_file"
+            serverName: "filesystem"
+        permission: deny
+      - name: "allow-directory-operations"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "create_directory"
+            serverName: "filesystem"
+        permission: allow
+
+  parameter_validation:
+    enabled: true
+    strict_mode: false
+
+  sensitive_data:
+    enabled: true
+    detectors:
+      - type: api-key
+        action: mask
+      - type: credit-card
+        action: mask
+      - type: jwt
+        action: mask
+      - type: email
+        action: log
+
+  content_filter:
+    enabled: true
+    rules:
+      - pattern: "rm -rf"
+        action: block
+        phase: input
+      - pattern: "sudo "
+        action: block
+        phase: input
+
+  rate_limiting:
+    enabled: true
+    rules:
+      - name: "per-minute-global"
+        window: "1m"
+        maxRequests: 60
+        keyBy: ["client-id"]
+
+# ─── Observability ─────────────────────────────────────────────
+observability:
+  metrics:
+    enabled: true
+    port: 9090
+    path: "/metrics"
+
+  audit_log:
+    enabled: true
+    output: stdout
+    format: jsonl
+
+  token_tracking:
+    enabled: true
+    estimation_mode: conservative
+
+# ─── Dashboard ─────────────────────────────────────────────────
+dashboard:
+  enabled: true
+  host: "127.0.0.1"
+  port: 9021
+
+# ─── Database (for persistent audit log) ────────────────────────
+database:
+  type: sqlite
+  sqlite:
+    path: "./data/mcp-firewall.db"

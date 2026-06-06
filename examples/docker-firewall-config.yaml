@@ -1,0 +1,101 @@
+# HTTP-mode test firewall config for Docker deployment
+# This proxies the mock MCP server over HTTP so we can hammer it with requests
+# and verify the observability stack.
+
+version: "1"
+mode: http
+
+server:
+  host: "0.0.0.0"
+  port: 9020
+
+upstreams:
+  - name: mock-server
+    transport: streamable-http
+    url: "http://127.0.0.1:8080"
+    headers: {}
+    healthCheck:
+      enabled: true
+      interval: "10s"
+
+auth:
+  enabled: false
+
+policies:
+  method_allowlist:
+    enabled: true
+    allowed_methods:
+      - initialize
+      - ping
+      - tools/list
+      - tools/call
+      - resources/list
+      - resources/read
+      - prompts/list
+      - prompts/get
+    block_unknown: true
+
+  rbac:
+    enabled: true
+    rules:
+      - name: "allow-all-tools"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "*"
+        permission: allow
+
+  rate_limiting:
+    enabled: true
+    rules:
+      - name: "per-minute-global"
+        window: "1m"
+        maxRequests: 300
+        keyBy: ["client-id"]
+
+  parameter_validation:
+    enabled: true
+
+  sensitive_data:
+    enabled: true
+    detectors:
+      - type: api-key
+        action: mask
+      - type: credit-card
+        action: mask
+
+observability:
+  metrics:
+    enabled: true
+    port: 9090
+    path: "/metrics"
+
+  tracing:
+    enabled: true
+    exporter: otlp
+    endpoint: "http://jaeger:4318/v1/traces"
+    sampleRate: 1.0
+
+  audit_log:
+    enabled: true
+    output: stdout
+    format: jsonl
+
+  token_tracking:
+    enabled: true
+    estimation_mode: conservative
+
+database:
+  type: sqlite
+  sqlite:
+    path: "/app/data/mcp-firewall.db"
+
+dashboard:
+  enabled: true
+  host: "0.0.0.0"
+  port: 9021
+
+sandbox:
+  enabled: false

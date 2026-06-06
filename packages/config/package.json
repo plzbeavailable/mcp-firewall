@@ -1,0 +1,36 @@
+{
+  "name": "@mcp-firewall/config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Configuration system for MCP Firewall — Zod schemas, YAML loading, hot-reload",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean --sourcemap",
+    "dev": "tsup src/index.ts --format esm --dts --watch --sourcemap",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist .tsbuildinfo"
+  },
+  "dependencies": {
+    "zod": "^3.24.0",
+    "js-yaml": "^4.1.0",
+    "chokidar": "^4.0.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.1.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.0.0"
+  }
+}

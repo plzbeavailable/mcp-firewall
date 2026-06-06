@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCP Firewall — 体验面板</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:system-ui, sans-serif; background:#0d1117; color:#c9d1d9; padding:24px 32px; max-width:780px; margin:auto; }
+  h1 { color:#58a6ff; font-size:20px; margin-bottom:4px; }
+  .sub { color:#8b949e; font-size:12px; margin-bottom:18px; }
+  .cards { display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+  .card { flex:1; min-width:140px; border:1px solid #30363d; border-radius:8px; padding:12px; background:#161b22; text-align:center; }
+  .card .num { font-size:28px; font-weight:700; }
+  .card .lbl { font-size:11px; color:#8b949e; margin-top:2px; }
+  .green { color:#3fb950; } .red { color:#f85149; }
+  button { background:#238636; color:#fff; border:none; padding:8px 14px; border-radius:6px; font-size:12px; cursor:pointer; margin:3px; font-weight:600; }
+  button.danger { background:#da3633; } button.warn { background:#9e6a03; }
+  button:hover { opacity:0.85; }
+  #log { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:10px; height:380px; overflow-y:auto; font-family:monospace; font-size:12px; line-height:1.7; margin-top:10px; }
+  .l-ok { color:#3fb950; } .l-err { color:#f85149; } .l-dim { color:#484f58; } .l-info { color:#8b949e; }
+</style>
+</head>
+<body>
+<h1>🛡️ MCP Firewall — 体验面板</h1>
+<div class="sub">Proxy → http://localhost:9020 | Metrics → :9090 | 按钮发请求看效果</div>
+
+<div class="cards">
+  <div class="card"><div class="num green" id="m-total">--</div><div class="lbl">总请求</div></div>
+  <div class="card"><div class="num red" id="m-block">--</div><div class="lbl">已拦截</div></div>
+  <div class="card"><div class="num green" id="m-allow">--</div><div class="lbl">已放行</div></div>
+  <div class="card"><div class="num" style="color:#8b949e" id="m-up">--</div><div class="lbl">运行时间</div></div>
+</div>
+
+<div>
+  <button onclick="call('echo',{message:'你好 MCP Firewall!'})">📣 Echo</button>
+  <button onclick="call('get_secret',{})">🔐 取敏感数据</button>
+  <button onclick="call('read_file',{path:'/tmp/test.txt'})">📄 读文件</button>
+  <button onclick="raw('tools/list')">📋 工具列表</button>
+  <button class="danger" onclick="raw('evil/hack')">💀 危险方法</button>
+  <button class="warn" onclick="call('echo',{message:'../../../etc/passwd'})">🗡️ 路径穿越</button>
+</div>
+
+<div id="log"><div class="l-info">🚀 点击上方按钮发送请求到防火墙</div></div>
+
+<script>
+const FW='http://localhost:9020'; const MX='http://localhost:9090/metrics'; let n=0;
+function L(m,c='l-info'){const e=document.getElementById('log');const t=new Date().toLocaleTimeString();e.innerHTML+=`<div class="${c}"><span class="l-dim">${t}</span> ${m}</div>`;e.scrollTop=e.scrollHeight}
+async function call(name,args){n++;L(`📤 tools/call → ${name}`);try{const r=await fetch(FW,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:'r'+n,method:'tools/call',params:{name,arguments:args}})});const d=await r.json();if(d.error){L(`🚫 已拦截: ${d.error.message}`,'l-err')}else{L(`✅ 响应: ${(d.result?.content?.[0]?.text||'').slice(0,120)}`,'l-ok')}}catch(e){L(`❌ ${e.message}`,'l-err')}M()}
+async function raw(method){n++;L(`📤 ${method}`);try{const r=await fetch(FW,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:'r'+n,method})});const d=await r.json();if(d.error){L(`🚫 已拦截: ${d.error.message}`,'l-err')}else{L(`✅ 成功`,'l-ok')}}catch(e){L(`❌ ${e.message}`,'l-err')}M()}
+async function M(){try{const t=await(await fetch(MX)).text();const T=(t.match(/mcp_requests_total\{/g)||[]).reduce((s,m)=>s+parseInt(m.split('} ')[1]||0),0);const B=(t.match(/verdict="block"/g)||[]).length;document.getElementById('m-total').textContent=T;document.getElementById('m-block').textContent=B;document.getElementById('m-allow').textContent=T-B;const u=(t.match(/uptime_seconds (\d+\.?\d*)/)||[])[1]||'0';document.getElementById('m-up').textContent=Math.round(+u)+'s'}catch(e){/* firewall may not be running */}}
+M();setInterval(M,3000);
+document.addEventListener('keydown',e=>{if(e.key==='1')call('echo',{message:'hello'});if(e.key==='4')raw('evil/hack');if(e.key==='5')call('echo',{message:'../../../etc/passwd'})});
+</script>
+</body>
+</html>
