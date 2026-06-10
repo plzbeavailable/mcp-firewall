@@ -12,6 +12,14 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Read version from package.json at runtime
+let CLI_VERSION = '0.1.0';
+try {
+  const pkgPath = resolve(__dirname, '../package.json');
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+  if (pkg.version) CLI_VERSION = pkg.version;
+} catch { /* fall back to default */ }
+
 // ─── Helpers ───────────────────────────────────────────────────
 
 function ask(rl: ReturnType<typeof createInterface>, question: string): Promise<string> {
@@ -585,8 +593,8 @@ const logsCommand = defineCommand({
   },
   args: {
     config: {
-      type: 'positional',
-      description: 'Path to config file',
+      type: 'string',
+      description: 'Path to firewall config file',
       default: 'mcp-firewall.yaml',
     },
     follow: {
@@ -609,7 +617,8 @@ const logsCommand = defineCommand({
       logFile = resolve(dirname(configPath), result.config.observability.auditLog.file ?? 'audit.log');
     } catch {
       console.error('❌ Could not load config to find audit log path.');
-      console.error('   Try: mcp-firewall logs --config <path>');
+      console.error(`   File: ${configPath}`);
+      console.error('   Use: mcp-firewall logs --config <path>');
       process.exit(1);
     }
 
@@ -717,6 +726,7 @@ const dashboardCommand = defineCommand({
     let auditLogPath: string | null = null;
     let configLayers: Record<string, boolean> = {};
 
+    // Resolve audit log path
     if (args['log-file']) {
       auditLogPath = path.resolve(args['log-file']);
     } else if (args.config) {
@@ -724,15 +734,35 @@ const dashboardCommand = defineCommand({
         const configPath = path.resolve(args.config);
         const { config } = loadConfig(configPath);
         auditLogPath = path.resolve(path.dirname(configPath), config.observability.auditLog.file ?? 'audit.log');
-        configLayers = {
-          methodAllowlist: config.policies.methodAllowlist.enabled,
-          rbac: config.policies.rbac.enabled,
-          rateLimiting: config.policies.rateLimiting.enabled,
-          parameterValidation: config.policies.parameterValidation.enabled,
-          contentFilter: config.policies.contentFilter.enabled,
-          sensitiveData: config.policies.sensitiveData.enabled,
-        };
       } catch { /* config optional */ }
+    }
+
+    // Load security layer status — try config file, then defaults
+    const configPath = args.config ? path.resolve(args.config) : path.resolve('mcp-firewall.yaml');
+    try {
+      const { config } = loadConfig(configPath);
+      configLayers = {
+        methodAllowlist: config.policies.methodAllowlist.enabled,
+        rbac: config.policies.rbac.enabled,
+        rateLimiting: config.policies.rateLimiting.enabled,
+        parameterValidation: config.policies.parameterValidation.enabled,
+        contentFilter: config.policies.contentFilter.enabled,
+        sensitiveData: config.policies.sensitiveData.enabled,
+      };
+      // If no explicit log file, derive from config
+      if (!auditLogPath) {
+        auditLogPath = path.resolve(path.dirname(configPath), config.observability.auditLog.file ?? 'audit.log');
+      }
+    } catch {
+      // No config available — show sensible defaults so dashboard isn't empty
+      configLayers = {
+        methodAllowlist: true,
+        rbac: true,
+        rateLimiting: false,
+        parameterValidation: true,
+        contentFilter: true,
+        sensitiveData: true,
+      };
     }
 
     // SSE clients
@@ -865,7 +895,7 @@ button{background:#238636;color:#fff;border:none;padding:10px 20px;border-radius
 const main = defineCommand({
   meta: {
     name: 'mcp-firewall',
-    version: '0.1.0',
+    version: CLI_VERSION,
     description: 'MCP Firewall — Security & Observability proxy for MCP',
   },
   subCommands: {
