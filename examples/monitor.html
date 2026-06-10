@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCP Firewall 实时监控</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:system-ui,sans-serif;background:#0a0e14;color:#c9d1d9;padding:20px 28px;max-width:700px;margin:auto}
+  h1{color:#58a6ff;font-size:18px;margin-bottom:4px}
+  .sub{color:#8b949e;font-size:11px;margin-bottom:16px}
+  .card{border:1px solid #30363d;border-radius:8px;padding:14px;background:#0d1117;margin-bottom:12px}
+  .card h3{font-size:12px;color:#8b949e;text-transform:uppercase;margin-bottom:8px;letter-spacing:.5px}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .stat{flex:1;min-width:100px;text-align:center;padding:10px;border-radius:6px;background:#161b22}
+  .stat .num{font-size:26px;font-weight:700}
+  .stat .lbl{font-size:10px;color:#8b949e;margin-top:2px}
+  .g{color:#3fb950}.r{color:#f85149}
+  .entry{font-family:monospace;font-size:11px;line-height:1.8;padding:4px 0;border-bottom:1px solid #21262d}
+  .entry .allow{color:#3fb950}.entry .block{color:#f85149}
+  .entry .method{color:#8b949e}.entry .count{font-weight:700}
+  .bar{height:4px;border-radius:2px;background:#21262d;margin:8px 0;overflow:hidden}
+  .bar .fill{height:100%;border-radius:2px;transition:width .3s}
+  .fill.g{background:#3fb950}.fill.r{background:#f85149}
+  .live{display:inline-block;width:8px;height:8px;border-radius:50%;background:#3fb950;margin-right:6px;animation:pulse 1.5s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .paused{background:#f85149;animation:none}
+  .debug{color:#d2991d;font-size:10px;margin-top:4px}
+</style>
+</head>
+<body>
+<h1>🛡️ MCP Firewall 实时监控</h1>
+<div class="sub"><span class="live" id="liveDot"></span><span id="liveText">监控中</span> · 每 2 秒刷新 · Prometheus :9090</div>
+
+<div class="row">
+  <div class="stat"><div class="num g" id="total">--</div><div class="lbl">总请求</div></div>
+  <div class="stat"><div class="num g" id="allowed">--</div><div class="lbl">放行</div></div>
+  <div class="stat"><div class="num r" id="blocked">--</div><div class="lbl">拦截</div></div>
+  <div class="stat"><div class="num" style="color:#8b949e" id="uptime">--</div><div class="lbl">运行时间</div></div>
+</div>
+
+<div class="bar"><div class="fill g" id="allowBar" style="width:0%"></div></div>
+
+<div style="color:#d2991d;font-size:10px;margin:8px 0" id="debug"></div>
+
+<div class="card">
+  <h3>📊 按方法统计</h3>
+  <div id="methods"></div>
+</div>
+
+<div class="card">
+  <h3>🚫 拦截原因</h3>
+  <div id="reasons"></div>
+</div>
+
+<script>
+const METRICS='/metrics';
+let lastTotal=-1;
+
+function parse(txt){
+  const result={requests:[],blocks:[],uptime:0,raw:txt.slice(0,500)};
+  for(const line of txt.split('\n')){
+    if(line.indexOf('mcp_requests_total')===0){
+      const m=line.match(/method="([^"]+)",server_name="([^"]+)",verdict="([^"]+)"/);
+      const c=parseInt((line.match(/\} (\d+)/)||[])[1]||'0');
+      if(m) result.requests.push({method:m[1],server:m[2],verdict:m[3],count:c});
+    }
+    if(line.indexOf('mcp_blocks_total')===0){
+      const m=line.match(/reason="([^"]+)"/);
+      const c=parseInt((line.match(/\} (\d+)/)||[])[1]||'0');
+      if(m) result.blocks.push({reason:m[1],count:c});
+    }
+    if(line.indexOf('mcp_firewall_uptime_seconds')===0){
+      result.uptime=parseFloat(line.split(' ')[1])||0;
+    }
+  }
+  return result;
+}
+
+function render(){
+  fetch(METRICS).then(r=>{
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.text();
+  }).then(txt=>{
+    const d=parse(txt);
+    const total=d.requests.reduce((s,r)=>s+r.count,0);
+    const blocked=d.requests.filter(r=>r.verdict==='block').reduce((s,r)=>s+r.count,0);
+    const allowed=total-blocked;
+    const rate=total>0?blocked/total:0;
+
+    document.getElementById('total').textContent=total;
+    document.getElementById('allowed').textContent=allowed;
+    document.getElementById('blocked').textContent=blocked;
+    document.getElementById('uptime').textContent=Math.round(d.uptime)+'s';
+    document.getElementById('allowBar').style.width=total>0?(100-rate*100)+'%':'0%';
+    document.getElementById('allowBar').className='fill '+(rate>0.2?'r':'g');
+    document.getElementById('debug').textContent='Got '+txt.length+' bytes, '+d.requests.length+' request types, '+d.blocks.length+' block types, uptime='+Math.round(d.uptime)+'s';
+
+    if(total!==lastTotal&&lastTotal>=0){
+      document.getElementById('liveDot').className='live';
+      document.getElementById('liveText').textContent='近期有活动 ('+lastTotal+'→'+total+')';
+    }
+    lastTotal=total;
+
+    document.getElementById('methods').innerHTML=d.requests
+      .sort((a,b)=>b.count-a.count)
+      .map(r=>`<div class="entry"><span class="${r.verdict==='block'?'block':'allow'}">${r.verdict==='block'?'🚫':'✅'}</span> <span class="method">${r.method}</span> @${r.server} <span class="count">${r.count}次</span></div>`)
+      .join('')||'<div class="entry method">暂无数据</div>';
+
+    document.getElementById('reasons').innerHTML=d.blocks
+      .sort((a,b)=>b.count-a.count)
+      .map(r=>`<div class="entry"><span class="block">🚫</span> ${r.reason} <span class="count">${r.count}次</span></div>`)
+      .join('')||'<div class="entry method">无拦截</div>';
+  }).catch(e=>{
+    document.getElementById('liveDot').className='paused';
+    document.getElementById('liveText').textContent='无法连接 ('+e.message+')';
+    document.getElementById('debug').textContent='Error: '+e.message;
+  });
+}
+
+render();
+setInterval(render,2000);
+</script>
+</body>
+</html>
