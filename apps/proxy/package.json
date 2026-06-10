@@ -1,6 +1,6 @@
 {
   "name": "@ziwansi/mcp-firewall",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP Firewall CLI — Security & Observability proxy for MCP (Model Context Protocol)",
   "license": "MIT",
   "author": "ziwansi",
@@ -9,7 +9,16 @@
     "url": "https://github.com/ziwansi/mcp-firewall"
   },
   "homepage": "https://github.com/ziwansi/mcp-firewall#readme",
-  "keywords": ["mcp", "model-context-protocol", "firewall", "security", "proxy", "cli", "mcp-server", "ai-security"],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "firewall",
+    "security",
+    "proxy",
+    "cli",
+    "mcp-server",
+    "ai-security"
+  ],
   "type": "module",
   "bin": {
     "mcp-firewall": "./dist/index.js"
