@@ -5,6 +5,30 @@ import { FirewallConfig, FirewallConfigSchema } from './schema';
 import { DEFAULT_CONFIG } from './defaults';
 import { interpolateEnv } from './interpolate';
 
+/**
+ * Convert snake_case keys to camelCase recursively.
+ * This allows users to write `method_allowlist` in YAML
+ * while the Zod schema expects `methodAllowlist`.
+ */
+function snakeToCamel(str: string): string {
+  return str.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+}
+
+function convertKeysToCamelCase(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(convertKeysToCamelCase);
+  }
+  if (value !== null && typeof value === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+      const camelKey = snakeToCamel(key);
+      result[camelKey] = convertKeysToCamelCase(val);
+    }
+    return result;
+  }
+  return value;
+}
+
 export interface LoadResult {
   config: FirewallConfig;
   filePath: string;
@@ -40,7 +64,10 @@ export function loadConfig(filePath: string): LoadResult {
   // Interpolate env vars recursively in the parsed object
   const interpolated = interpolateValues(parsed);
 
-  const merged = deepMerge(DEFAULT_CONFIG, interpolated as Record<string, unknown>);
+  // Convert snake_case keys to camelCase for Zod schema compatibility
+  const camelCased = convertKeysToCamelCase(interpolated);
+
+  const merged = deepMerge(DEFAULT_CONFIG, camelCased as Record<string, unknown>);
   const config = FirewallConfigSchema.parse(merged);
 
   return { config, filePath: resolved };
@@ -58,8 +85,9 @@ export function loadConfigFromString(content: string): FirewallConfig {
   }
 
   const interpolated = interpolateValues(parsed);
+  const camelCased = convertKeysToCamelCase(interpolated);
 
-  const merged = deepMerge(DEFAULT_CONFIG, interpolated as Record<string, unknown>);
+  const merged = deepMerge(DEFAULT_CONFIG, camelCased as Record<string, unknown>);
   return FirewallConfigSchema.parse(merged);
 }
 

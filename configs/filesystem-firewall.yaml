@@ -1,0 +1,317 @@
+# ═══════════════════════════════════════════════════════════════
+# MCP Firewall — Filesystem Server 保护配置
+# 用途：将 Filesystem MCP Server 放在防火墙后面，
+#       只允许只读操作，拦截所有写入/删除/移动操作。
+#       对文件内容中的敏感数据自动脱敏。
+#       检测并拦截命令注入、路径穿越、SQL注入等攻击。
+#
+# Claude Code 配置 .mcp.json 中引用此文件：
+#   "command": "node"
+#   "args": ["E:/hub/mcp-firewall/apps/proxy/dist/index.js", "run", "E:/hub/mcp-firewall/configs/filesystem-firewall.yaml"]
+# ═══════════════════════════════════════════════════════════════
+
+version: "1"
+mode: stdio
+
+# ─── 上游：真实 Filesystem MCP Server ──────────────────────
+
+upstreams:
+  - name: filesystem
+    transport: stdio
+    command: node
+    args:
+      - "C:/Users/Muen_/AppData/Roaming/npm/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js"
+      - "E:/hub"
+
+# ═══════════════════════════════════════════════════════════════
+# 安全策略（6 层纵深防御，全部启用）
+# ═══════════════════════════════════════════════════════════════
+
+policies:
+
+  # ── 第 1 层：方法白名单 ─────────────────────────────────
+
+  methodAllowlist:
+    enabled: true
+    allowedMethods:
+      - initialize
+      - ping
+      - tools/list
+      - tools/call
+      - resources/list
+      - resources/read
+      - prompts/list
+      - prompts/get
+      - notifications/initialized
+    blockUnknown: true
+
+  # ── 第 2 层：RBAC 访问控制 ──────────────────────────────
+  # defaultDeny + 显式 allow = 白名单模式
+  # 额外添加 deny 规则作为 defense-in-depth：
+  #   即使有人误加 allow 规则，deny 规则仍优先拦截危险操作
+
+  rbac:
+    enabled: true
+    defaultDeny: true
+    rules:
+
+      # ── 显式拒绝（优先级最高，defense-in-depth）─────
+
+      - name: "deny-write-file"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "write_file"
+        permission: deny
+
+      - name: "deny-edit-file"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "edit_file"
+        permission: deny
+
+      - name: "deny-create-directory"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "create_directory"
+        permission: deny
+
+      - name: "deny-move-file"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "move_file"
+        permission: deny
+
+      - name: "deny-delete-files"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "delete_files"
+        permission: deny
+
+      - name: "deny-get-file-info-sensitive"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "edit_file"
+        permission: deny
+
+      # ── 允许协议基础方法 ─────────────────────────────
+
+      - name: "allow-system-methods"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "initialize"
+          - method: "ping"
+          - method: "tools/list"
+          - method: "notifications/initialized"
+          - method: "resources/list"
+          - method: "resources/read"
+          - method: "prompts/list"
+          - method: "prompts/get"
+        permission: allow
+
+      # ── 允许只读文件操作 ─────────────────────────────
+
+      - name: "allow-read-file"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "read_file"
+        permission: allow
+
+      - name: "allow-read-text-file"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "read_text_file"
+        permission: allow
+
+      - name: "allow-read-media-file"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "read_media_file"
+        permission: allow
+
+      - name: "allow-read-multiple"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "read_multiple_files"
+        permission: allow
+
+      - name: "allow-list-directory"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "list_directory"
+        permission: allow
+
+      - name: "allow-list-with-sizes"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "list_directory_with_sizes"
+        permission: allow
+
+      - name: "allow-directory-tree"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "directory_tree"
+        permission: allow
+
+      - name: "allow-search-files"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "search_files"
+        permission: allow
+
+      - name: "allow-get-file-info"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "get_file_info"
+        permission: allow
+
+      - name: "allow-list-allowed-dirs"
+        principals:
+          - type: client-id
+            pattern: "*"
+        targets:
+          - method: "tools/call"
+            toolName: "list_allowed_directories"
+        permission: allow
+
+  # ── 第 3 层：速率限制 ─────────────────────────────────
+
+  rateLimiting:
+    enabled: true
+    rules:
+      - name: "per-minute-limit"
+        window: "1m"
+        maxRequests: 60
+        keyBy: ["client-id"]
+
+  # ── 第 4 层：参数校验（注入攻击防御） ─────────────────
+
+  parameterValidation:
+    enabled: true
+    strictMode: false
+
+  # ── 第 5 层：内容过滤（敏感文件路径拦截） ─────────────
+
+  contentFilter:
+    enabled: true
+    rules:
+      # 拦截读取凭证/密钥文件
+      - pattern: "(\\\\|/)(\\.env|\\.git-credentials|\\.npmrc|\\.pypirc|credentials\\.json|secrets?\\.(ya?ml|json|env))"
+        action: block
+        phase: input
+
+      # 拦截读取 SSH / TLS 私钥
+      - pattern: "(\\\\|/)(id_rsa|id_ed25519|id_ecdsa|id_dsa|.*\\.pem|.*\\.key(?!\\w))"
+        action: block
+        phase: input
+
+      # 拦截密码文件
+      - pattern: "(\\\\|/)(passwords?\\.|masterkey|\\\\.htpasswd|\\\\.pgpass)"
+        action: block
+        phase: input
+
+      # 拦截配置中的 token/secret
+      - pattern: "(token|secret|password|api[_-]?key)\\s*[=:]\\s*['\"]?\\S{8,}"
+        action: block
+        phase: output
+
+  # ── 第 6 层：敏感数据检测（响应内容脱敏） ─────────────
+
+  sensitiveData:
+    enabled: true
+    detectors:
+      - type: api-key
+        action: mask
+      - type: credit-card
+        action: mask
+      - type: jwt
+        action: mask
+      - type: email
+        action: mask
+      - type: phone
+        action: mask
+      - type: ssn
+        action: mask
+      - type: private-key
+        action: block
+      - type: connection-string
+        action: block
+
+# ═══════════════════════════════════════════════════════════════
+# 认证（stdio 模式下不需要）
+# ═══════════════════════════════════════════════════════════════
+
+auth:
+  enabled: false
+
+# ═══════════════════════════════════════════════════════════════
+# 可观测性
+# ═══════════════════════════════════════════════════════════════
+
+observability:
+  metrics:
+    enabled: false
+  tracing:
+    enabled: false
+  auditLog:
+    enabled: true
+    output: file
+    file: "E:/hub/mcp-firewall/logs/audit.jsonl"
+    format: jsonl
+  tokenTracking:
+    enabled: false
+
+# ═══════════════════════════════════════════════════════════════
+# 仪表板与沙箱
+# ═══════════════════════════════════════════════════════════════
+
+dashboard:
+  enabled: false
+sandbox:
+  enabled: false

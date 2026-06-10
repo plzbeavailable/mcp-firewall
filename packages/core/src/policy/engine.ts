@@ -1,4 +1,4 @@
-import type { FirewallConfig } from '@mcp-firewall/config';
+import type { FirewallConfig } from '@ziwansi/mcp-firewall-config';
 import { MethodAllowlistMiddleware } from '../security/method-allowlist';
 import { ApiKeyAuthMiddleware, ApiKeyEntry } from '../security/api-key-auth';
 import { RbacMiddleware } from '../security/rbac';
@@ -100,7 +100,7 @@ export class PolicyEngine {
 
     // 3. RBAC (priority 30)
     if (policies.rbac.enabled && policies.rbac.rules.length > 0) {
-      pipeline.register(new RbacMiddleware(policies.rbac.rules));
+      pipeline.register(new RbacMiddleware(policies.rbac.rules, !policies.rbac.defaultDeny));
     }
 
     // 4. Rate Limiting (priority 40)

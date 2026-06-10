@@ -264,6 +264,16 @@ export class ParameterValidationMiddleware implements SecurityMiddleware {
       };
     }
 
+    // Command injection patterns
+    if (this.hasCommandInjectionPatterns(serialized)) {
+      return {
+        verdict: 'block',
+        reason: 'Potential command injection pattern detected in parameters',
+        errorCode: -32602,
+        metadata: { pattern: 'command-injection' },
+      };
+    }
+
     return null;
   }
 
@@ -276,6 +286,26 @@ export class ParameterValidationMiddleware implements SecurityMiddleware {
       /(\bUPDATE\b\s+\bSET\b)/i,
       /(';\s*--)/,
       /(\bUNION\b\s+\bSELECT\b)/i,
+    ];
+
+    return patterns.some((p) => p.test(text));
+  }
+
+  private hasCommandInjectionPatterns(text: string): boolean {
+    const patterns = [
+      /\$\([^)]*\)/,           // $(cmd) subshell
+      /`[^`]+`/,               // backtick subshell
+      /\|\s*(?:sh|bash|cmd|powershell|python|perl|ruby|lua)(?:\s|$)/i,  // pipe to shell
+      /&&\s*(?:rm|mv|cp|curl|wget|nc|telnet|chmod|chown|kill|reboot|shutdown)/i,  // chained destructive
+      /\|\|\s*(?:rm|shutdown)/i,  // || fallback attack
+      /;\s*(?:rm\s+-rf|mkfs|dd\s+if|cat\s+\/dev)/i,  // semicolon + destructive
+      /\/dev\/(?:null|zero|random|urandom)\s+of=/i,   // dd-style overwrite
+      /sudo\s+(?:rm|mv|chmod)/i,   // sudo + destructive
+      /\/etc\/(?:passwd|shadow|sudoers)/i,  // targeting system files
+      />\s*\/dev\/[a-z]+/,      // redirect to device
+      /<(?:__import__|eval|exec|compile)\(/i,  // Python code injection
+      /System\.(?:exec|getRuntime|exit)/i,  // Java code injection
+      /os\.(?:system|popen|exec)/i,  // Python os injection
     ];
 
     return patterns.some((p) => p.test(text));

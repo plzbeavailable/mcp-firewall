@@ -69,6 +69,14 @@ export class HttpProxy {
   start(): Promise<void> {
     return new Promise((resolve) => {
       this.server = createServer((req, res) => this.handleRequest(req, res));
+      this.server.on('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EADDRINUSE') {
+          console.error(`[mcp-firewall] HTTP proxy port ${this.options.port} already in use — skipping`);
+          resolve(); // Don't crash, just skip
+        } else {
+          throw err;
+        }
+      });
       this.server.listen(this.options.port, this.options.host, () => {
         resolve();
       });

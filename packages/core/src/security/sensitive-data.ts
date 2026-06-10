@@ -19,6 +19,10 @@ const BUILTIN_PATTERNS: Record<string, RegExp> = {
   jwt: /\beyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\b/,
   phone: /\b(?:\+\d{1,3}[-.]?)?\(?\d{3}\)?[-.]?\d{3}[-.]?\d{4}\b/,
   ssn: /\b\d{3}-\d{2}-\d{4}\b/,
+  'private-key':
+    /-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----[\s\S]*?-----END\s+(RSA\s+)?PRIVATE\s+KEY-----/,
+  'connection-string':
+    /\b(mongodb(?:\+srv)?|postgres(?:ql)?|mysql|redis|sqlite|jdbc|mssql):\/\/[^\s"']+/i,
 };
 
 const MASK_REPLACEMENT = '***REDACTED***';

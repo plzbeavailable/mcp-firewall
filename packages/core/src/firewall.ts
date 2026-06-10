@@ -1,8 +1,9 @@
-import type { FirewallConfig } from '@mcp-firewall/config';
-import { loadConfig, type LoadResult } from '@mcp-firewall/config';
+import type { FirewallConfig } from '@ziwansi/mcp-firewall-config';
+import { loadConfig, type LoadResult } from '@ziwansi/mcp-firewall-config';
 import { PolicyEngine } from './policy/engine';
 import { Pipeline } from './pipeline/pipeline';
 import { createPipelineContext, cloneContextForResponse } from './pipeline/context';
+import type { PipelineContext } from './pipeline/types';
 import { StdioProxy, HttpProxy, SseProxy } from './transport';
 import { MetricsCollector } from './observability/metrics';
 import { AuditLogger, TokenTracker, Tracer, HealthChecker } from './observability/audit-log';
@@ -45,6 +46,9 @@ export class MCPFirewall {
   private stdioProxy: StdioProxy | null = null;
   private httpProxy: HttpProxy | null = null;
   private sseProxy: SseProxy | null = null;
+
+  /** Maps JSON-RPC request IDs to their PipelineContext for response matching */
+  private requestContexts = new Map<string | number, PipelineContext>();
 
   private running = false;
 
@@ -292,21 +296,26 @@ export class MCPFirewall {
       this.tracer.endSpan(span, 'error');
       this.auditLogger.log(ctx);
 
-      // Return a JSON-RPC error — write it directly to stdout
-      // since the proxy won't forward null results
       const errorResp = createErrorResponse(
         msg.id,
         result.blockDecision?.errorCode ?? -32001,
         result.blockDecision?.reason ?? 'Request blocked by firewall',
       );
-      process.stdout.write(serializeMessage(errorResp));
 
-      // Return null so the proxy doesn't forward to child
+      // In stdio mode, the proxy expects the interceptor to write
+      // the error response to stdout itself. In HTTP/SSE mode,
+      // the proxy sends its own 403 response when we return null.
+      if (this.config.mode === 'stdio') {
+        process.stdout.write(serializeMessage(errorResp));
+      }
+
+      // Return null so the proxy doesn't forward to the upstream
       return null;
     }
 
     // Store context for matching response
     ctx.metadata['_span'] = span;
+    this.requestContexts.set(msg.id, ctx);
     this.metrics.incrementConnections();
 
     // Forward the request
@@ -320,13 +329,15 @@ export class MCPFirewall {
   ): Promise<JSONRPCMessage | null> {
     if (!isResponse(msg)) return msg;
 
-    // Find matching request context (simplified: use the latest)
-    // In production, we'd maintain a request map keyed by JSON-RPC id.
+    // Look up the matching request context by JSON-RPC id.
+    // Clean up the entry after retrieval to avoid memory leaks.
+    const storedCtx = this.requestContexts.get(msg.id);
+    this.requestContexts.delete(msg.id);
 
-    const ctx = createPipelineContext({
+    const ctx = storedCtx ?? createPipelineContext({
       clientId: 'default',
       serverName,
-      method: 'tools/call', // Approximate; real impl tracks this
+      method: 'unknown',
       request: { jsonrpc: '2.0', id: msg.id, method: '' },
     });
 
@@ -400,6 +411,14 @@ export class MCPFirewall {
       res.end(this.metrics.toPrometheusText());
     });
 
+    server.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`[mcp-firewall] Metrics port ${port} already in use — skipping`);
+      } else {
+        throw err;
+      }
+    });
+
     server.listen(port, () => {
       console.error(`[mcp-firewall] Metrics endpoint: http://localhost:${port}${path}`);
     });
@@ -420,6 +439,14 @@ export class MCPFirewall {
         version: '0.1.0',
         metrics: snapshot,
       }));
+    });
+
+    server.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`[mcp-firewall] Dashboard port ${port} already in use — skipping`);
+      } else {
+        throw err;
+      }
     });
 
     server.listen(port, host, () => {

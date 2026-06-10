@@ -1,12 +1,22 @@
 {
-  "name": "@mcp-firewall/proxy",
+  "name": "@ziwansi/mcp-firewall",
   "version": "0.1.0",
-  "private": true,
-  "description": "MCP Firewall CLI — the main entry point for running the firewall proxy",
+  "description": "MCP Firewall CLI — Security & Observability proxy for MCP (Model Context Protocol)",
+  "license": "MIT",
+  "author": "ziwansi",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ziwansi/mcp-firewall"
+  },
+  "homepage": "https://github.com/ziwansi/mcp-firewall#readme",
+  "keywords": ["mcp", "model-context-protocol", "firewall", "security", "proxy", "cli", "mcp-server", "ai-security"],
   "type": "module",
   "bin": {
     "mcp-firewall": "./dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean --sourcemap",
     "dev": "tsup src/index.ts --format esm --dts --watch --sourcemap",
@@ -17,8 +27,8 @@
     "clean": "rm -rf dist .tsbuildinfo"
   },
   "dependencies": {
-    "@mcp-firewall/core": "workspace:*",
-    "@mcp-firewall/config": "workspace:*",
+    "@ziwansi/mcp-firewall-core": "^0.1.0",
+    "@ziwansi/mcp-firewall-config": "^0.1.0",
     "citty": "^0.1.6"
   },
   "devDependencies": {

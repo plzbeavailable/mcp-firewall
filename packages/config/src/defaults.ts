@@ -36,6 +36,7 @@ export const DEFAULT_CONFIG: Partial<FirewallConfig> = {
     rbac: {
       enabled: false,
       rules: [],
+      defaultDeny: false,
     },
     rateLimiting: {
       enabled: false,
@@ -57,6 +58,11 @@ export const DEFAULT_CONFIG: Partial<FirewallConfig> = {
         { type: 'credit-card', action: 'mask' },
         { type: 'api-key', action: 'mask' },
         { type: 'jwt', action: 'mask' },
+        { type: 'email', action: 'mask' },
+        { type: 'phone', action: 'mask' },
+        { type: 'ssn', action: 'mask' },
+        { type: 'private-key', action: 'block' },
+        { type: 'connection-string', action: 'block' },
       ],
     },
   },

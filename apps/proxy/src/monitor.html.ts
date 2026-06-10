@@ -1,0 +1,376 @@
+// Auto-generated — bundled monitor.html for the dashboard
+// This ensures the dashboard HTML is always available regardless of install location.
+export const MONITOR_HTML = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🛡️ MCP Firewall — Live Monitor</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --card: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d2991d;
+    --purple: #a371f7;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  header {
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--card);
+  }
+  header h1 { font-size: 1.4rem; color: var(--accent); }
+  .status-dot {
+    display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px;
+    animation: pulse 2s infinite;
+  }
+  .status-dot.online { background: var(--green); }
+  .status-dot.offline { background: var(--red); animation: none; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  main { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+  }
+  .stat-card .label { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .stat-card .value { font-size: 2rem; font-weight: 700; margin-top: 4px; }
+  .stat-card .value.green { color: var(--green); }
+  .stat-card .value.red { color: var(--red); }
+  .stat-card .value.yellow { color: var(--yellow); }
+  .stat-card .sub { font-size: .75rem; color: var(--muted); margin-top: 4px; }
+
+  .section-title {
+    font-size: 1rem; font-weight: 600; color: var(--accent);
+    margin-bottom: 12px; margin-top: 24px;
+  }
+  .layers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .layer-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    display: flex; align-items: flex-start; gap: 12px;
+  }
+  .layer-icon { font-size: 1.5rem; width: 40px; text-align: center; flex-shrink: 0; }
+  .layer-info { flex: 1; }
+  .layer-name { font-weight: 600; }
+  .layer-desc { font-size: .8rem; color: var(--muted); margin-top: 2px; }
+  .layer-status {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: .7rem; font-weight: 600; margin-top: 6px;
+  }
+  .layer-status.enabled { background: rgba(63,185,80,.15); color: var(--green); }
+  .layer-status.disabled { background: rgba(139,148,158,.15); color: var(--muted); }
+
+  .log-container {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .log-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .log-header h3 { font-size: .9rem; }
+  .log-controls { display: flex; gap: 8px; }
+  .log-controls button {
+    background: var(--border); color: var(--text); border: none;
+    padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: .75rem;
+  }
+  .log-controls button:hover { background: #484f58; }
+  .log-controls button.active { background: var(--accent); color: #fff; }
+  .log-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+  .log-table th {
+    text-align: left; padding: 8px 16px; color: var(--muted); font-weight: 500;
+    border-bottom: 1px solid var(--border); font-size: .7rem; text-transform: uppercase;
+  }
+  .log-table td { padding: 8px 16px; border-bottom: 1px solid rgba(48,54,61,.5); }
+  .log-table tr:hover { background: rgba(88,166,255,.05); }
+  .verdict-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: .7rem; font-weight: 600;
+  }
+  .verdict-badge.allow { background: rgba(63,185,80,.15); color: var(--green); }
+  .verdict-badge.block { background: rgba(248,81,73,.15); color: var(--red); }
+  .verdict-badge.warn { background: rgba(210,153,29,.15); color: var(--yellow); }
+  .reason-text { color: var(--red); font-size: .75rem; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .empty-state { text-align: center; padding: 48px 24px; color: var(--muted); }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+  .empty-state code {
+    background: var(--border); padding: 2px 8px; border-radius: 4px;
+    font-size: .85rem; color: var(--accent);
+  }
+
+  .toggle-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .toggle-panel h3 { font-size: .9rem; margin-bottom: 12px; color: var(--accent); }
+  .toggle-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 10px;
+  }
+  .toggle-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 12px; background: var(--bg); border-radius: 4px;
+  }
+  .toggle-row .name { font-size: .8rem; }
+  .toggle-row .desc { font-size: .7rem; color: var(--muted); }
+  .toggle-switch {
+    position: relative; width: 44px; height: 24px; flex-shrink: 0;
+  }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--border); border-radius: 24px; transition: .3s;
+  }
+  .toggle-slider:before {
+    content: ""; position: absolute; height: 18px; width: 18px;
+    left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: .3s;
+  }
+  input:checked + .toggle-slider { background: var(--green); }
+  input:checked + .toggle-slider:before { transform: translateX(20px); }
+
+  @media (max-width: 768px) {
+    header { padding: 12px 16px; }
+    main { padding: 12px; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .layers-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1><span class="status-dot online" id="statusDot"></span>MCP Firewall Live Monitor</h1>
+  </div>
+  <div style="font-size:.8rem;color:var(--muted)" id="clock">--</div>
+</header>
+
+<main>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="label">Total Requests</div>
+      <div class="value" id="statTotal">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Allowed</div>
+      <div class="value green" id="statAllowed">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Blocked</div>
+      <div class="value red" id="statBlocked">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Warnings</div>
+      <div class="value yellow" id="statWarned">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Security Layers Active</div>
+      <div class="value" style="color:var(--purple)" id="statLayers">0/6</div>
+    </div>
+  </div>
+
+  <div class="section-title">🛡️ Security Layers</div>
+  <div class="layers-grid" id="layersGrid"></div>
+
+  <div class="log-container">
+    <div class="log-header">
+      <h3>📋 Live Audit Log</h3>
+      <div class="log-controls">
+        <button id="btnAll" class="active" onclick="setFilter('all')">All</button>
+        <button id="btnBlocked" onclick="setFilter('block')">🚫 Blocked</button>
+        <button id="btnAllowed" onclick="setFilter('allow')">✅ Allowed</button>
+        <button id="btnPause" onclick="togglePause()">⏸ Pause</button>
+      </div>
+    </div>
+    <div style="max-height:500px;overflow-y:auto" id="logScroll">
+      <table class="log-table">
+        <thead>
+          <tr><th>Time</th><th>Method</th><th>Tool</th><th>Verdict</th><th>Duration</th><th>Reason</th></tr>
+        </thead>
+        <tbody id="logBody">
+          <tr><td colspan="6"><div class="empty-state"><div class="icon">📭</div>Waiting for requests...<br><br>Start the proxy:<br><code>mcp-firewall run config.yaml</code></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  let filter = 'all';
+  let paused = false;
+  let entries = [];
+  const MAX_ENTRIES = 200;
+
+  const LAYER_DEFS = [
+    { id: 'methodAllowlist', name: 'Method Allowlist', desc: 'Only known MCP methods pass', icon: '📋' },
+    { id: 'rbac', name: 'RBAC Access Control', desc: 'Role-based tool & method permissions', icon: '🔐' },
+    { id: 'rateLimiting', name: 'Rate Limiting', desc: 'Sliding-window request throttling', icon: '⏱️' },
+    { id: 'parameterValidation', name: 'Parameter Validation', desc: 'Path traversal, null byte, SQL/CMD injection', icon: '🔍' },
+    { id: 'contentFilter', name: 'Content Filter', desc: 'Sensitive file path & pattern blocking', icon: '🚧' },
+    { id: 'sensitiveData', name: 'Sensitive Data Detect', desc: 'API keys, CC, JWT, private keys masking', icon: '🔒' },
+  ];
+
+  function updateClock() {
+    document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  function renderLayers(layers) {
+    const grid = document.getElementById('layersGrid');
+    grid.innerHTML = LAYER_DEFS.map(l => {
+      const info = layers[l.id] ?? {};
+      const enabled = info.enabled === true;
+      return \`
+        <div class="layer-card">
+          <div class="layer-icon">\${l.icon}</div>
+          <div class="layer-info">
+            <div class="layer-name">\${l.name}</div>
+            <div class="layer-desc">\${l.desc}</div>
+            <span class="layer-status \${enabled ? 'enabled' : 'disabled'}">\${enabled ? '● ENABLED' : '○ DISABLED'}</span>
+          </div>
+        </div>\`;
+    }).join('');
+
+    const active = Object.values(layers).filter(v => v === true).length;
+    document.getElementById('statLayers').textContent = \`\${active}/6\`;
+  }
+
+  function formatTime(ts) {
+    if (!ts) return '--:--:--';
+    return ts.substring(11, 23);
+  }
+
+  function renderLogs() {
+    const filtered = filter === 'all' ? entries : entries.filter(e => e.verdict === filter);
+    const tbody = document.getElementById('logBody');
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = \`<tr><td colspan="6"><div class="empty-state"><div class="icon">📭</div>No \${filter === 'all' ? '' : filter + ' '}entries yet</div></td></tr>\`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.slice(0, 50).map(e => \`
+      <tr>
+        <td style="white-space:nowrap;color:var(--muted)">\${formatTime(e.timestamp)}</td>
+        <td>\${e.method ?? '?'}</td>
+        <td>\${e.toolName ?? 'N/A'}</td>
+        <td><span class="verdict-badge \${e.verdict}">\${e.verdict?.toUpperCase()}</span></td>
+        <td style="color:var(--muted)">\${e.durationMs ?? '?'}ms</td>
+        <td class="reason-text" title="\${e.blockReason ?? ''}">\${e.blockReason ?? '—'}</td>
+      </tr>
+    \`).join('');
+  }
+
+  function updateStats() {
+    const blocks = entries.filter(e => e.verdict === 'block').length;
+    const allows = entries.filter(e => e.verdict === 'allow').length;
+    const warns = entries.filter(e => e.verdict === 'warn').length;
+
+    document.getElementById('statTotal').textContent = entries.length;
+    document.getElementById('statAllowed').textContent = allows;
+    document.getElementById('statBlocked').textContent = blocks;
+    document.getElementById('statWarned').textContent = warns;
+  }
+
+  function setFilter(f) {
+    filter = f;
+    document.querySelectorAll('.log-controls button').forEach(b => b.classList.remove('active'));
+    document.getElementById('btn' + f.charAt(0).toUpperCase() + f.slice(1)).classList.add('active');
+    renderLogs();
+  }
+
+  function togglePause() {
+    paused = !paused;
+    document.getElementById('btnPause').textContent = paused ? '▶ Resume' : '⏸ Pause';
+  }
+
+  async function poll() {
+    try {
+      const resp = await fetch('/api/status');
+      const data = await resp.json();
+
+      if (data.layers) renderLayers(data.layers);
+
+      const dot = document.getElementById('statusDot');
+      dot.className = 'status-dot ' + (data.connected ? 'online' : 'offline');
+
+      if (data.entries && data.entries.length > 0 && !paused) {
+        const existingIds = new Set(entries.map(e => e.id));
+        const newEntries = data.entries.filter(e => !existingIds.has(e.id));
+        if (newEntries.length > 0) {
+          entries = [...newEntries, ...entries].slice(0, MAX_ENTRIES);
+          renderLogs();
+          updateStats();
+        }
+      }
+    } catch (err) {
+      document.getElementById('statusDot').className = 'status-dot offline';
+    }
+  }
+
+  function connectSSE() {
+    const evtSource = new EventSource('/api/events');
+    evtSource.onmessage = (event) => {
+      if (paused) return;
+      try {
+        const entry = JSON.parse(event.data);
+        entries.unshift(entry);
+        if (entries.length > MAX_ENTRIES) entries.length = MAX_ENTRIES;
+        renderLogs();
+        updateStats();
+      } catch(e) { /* skip */ }
+    };
+    evtSource.onerror = () => {
+      setTimeout(connectSSE, 5000);
+    };
+    return evtSource;
+  }
+
+  renderLayers(Object.fromEntries(LAYER_DEFS.map(l => [l.id, false])));
+  poll();
+  setInterval(poll, 3000);
+  connectSSE();
+</script>
+</body>
+</html>`;

@@ -132,7 +132,7 @@ export const ContentFilterRule = z.object({
 });
 
 export const SensitiveDataDetector = z.object({
-  type: z.enum(['credit-card', 'api-key', 'email', 'jwt', 'phone', 'ssn', 'custom']),
+  type: z.enum(['credit-card', 'api-key', 'email', 'jwt', 'phone', 'ssn', 'private-key', 'connection-string', 'custom']),
   action: z.enum(['block', 'mask', 'log']),
   name: z.string().optional(),
   pattern: z.string().optional(),
@@ -161,6 +161,7 @@ export const PolicyConfig = z.object({
     .object({
       enabled: z.boolean().default(false),
       rules: z.array(RBACRule).default([]),
+      defaultDeny: z.boolean().default(false),
     })
     .default({}),
   rateLimiting: z

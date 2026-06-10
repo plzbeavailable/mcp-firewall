@@ -1,11 +1,20 @@
 {
-  "name": "@mcp-firewall/core",
+  "name": "@ziwansi/mcp-firewall-core",
   "version": "0.1.0",
-  "private": true,
   "description": "Core proxy engine, security pipeline, and observability for MCP Firewall",
+  "license": "MIT",
+  "author": "ziwansi",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ziwansi/mcp-firewall"
+  },
+  "keywords": ["mcp", "model-context-protocol", "firewall", "security", "proxy"],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": {
       "import": "./dist/index.js",
@@ -23,7 +32,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.0.4",
-    "@mcp-firewall/config": "workspace:*",
+    "@ziwansi/mcp-firewall-config": "^0.1.0",
     "@modelcontextprotocol/sdk": "^1.9.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1"

@@ -1,5 +1,5 @@
 import type { SecurityMiddleware, PipelineContext, SecurityDecision } from '../pipeline/types';
-import type { RBACRule } from '@mcp-firewall/config';
+import type { RBACRule } from '@ziwansi/mcp-firewall-config';
 
 // Re-define the types we need locally to avoid Zod inference issues
 type PrincipalType = 'api-key' | 'jwt-claim' | 'client-id';

@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { appendFileSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 import type { PipelineContext } from '../pipeline/types';
 import type { MetricsCollector, MetricsSnapshot } from './metrics';
 
@@ -110,14 +112,20 @@ export class AuditLogger {
   }
 
   private write(entry: AuditLogEntry): void {
+    const line = JSON.stringify(entry);
     switch (this.options.output) {
       case 'stdout':
-        console.log(JSON.stringify(entry));
+        console.log(line);
         break;
       case 'file':
-        // In the full implementation, this would write to the file.
-        // For Phase 1, we log to stdout with a marker.
-        console.log(JSON.stringify({ ...entry, _file: this.options.filePath }));
+        try {
+          const filePath = this.options.filePath;
+          mkdirSync(dirname(filePath), { recursive: true });
+          appendFileSync(filePath, line + '\n', 'utf-8');
+        } catch {
+          // Fallback: don't crash if file write fails
+          console.error(`[audit-log] Failed to write to ${this.options.filePath}`);
+        }
         break;
       case 'sqlite':
       case 'postgres':

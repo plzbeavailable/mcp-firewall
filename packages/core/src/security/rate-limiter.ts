@@ -1,5 +1,5 @@
 import type { SecurityMiddleware, PipelineContext, SecurityDecision } from '../pipeline/types';
-import type { RateLimitRule } from '@mcp-firewall/config';
+import type { RateLimitRule } from '@ziwansi/mcp-firewall-config';
 
 // ─── Rate Limiter ──────────────────────────────────────────────
 

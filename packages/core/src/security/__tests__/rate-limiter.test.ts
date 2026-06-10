@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { RateLimiterMiddleware } from '../../security/rate-limiter';
 import { createPipelineContext } from '../../pipeline/context';
-import type { RateLimitRule } from '@mcp-firewall/config';
+import type { RateLimitRule } from '@ziwansi/mcp-firewall-config';
 
 describe('RateLimiterMiddleware', () => {
   let middleware: RateLimiterMiddleware;

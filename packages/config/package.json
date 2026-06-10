@@ -1,11 +1,20 @@
 {
-  "name": "@mcp-firewall/config",
+  "name": "@ziwansi/mcp-firewall-config",
   "version": "0.1.0",
-  "private": true,
   "description": "Configuration system for MCP Firewall — Zod schemas, YAML loading, hot-reload",
+  "license": "MIT",
+  "author": "ziwansi",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ziwansi/mcp-firewall"
+  },
+  "keywords": ["mcp", "model-context-protocol", "firewall", "security", "proxy"],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": {
       "import": "./dist/index.js",
