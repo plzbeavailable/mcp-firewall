@@ -1,211 +1,176 @@
-# MCP Firewall
+<p align="center">
+  <img src="https://img.shields.io/npm/v/@ziwansi/mcp-firewall?color=58a6ff" alt="npm version">
+  <img src="https://img.shields.io/npm/dm/@ziwansi/mcp-firewall?color=3fb950" alt="downloads">
+  <img src="https://img.shields.io/github/license/plzbeavailable/mcp-firewall?color=a371f7" alt="license">
+  <img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen" alt="node">
+  <img src="https://img.shields.io/badge/platform-windows%20%7C%20macos%20%7C%20linux-lightgrey" alt="platform">
+</p>
 
-> **Security & Observability proxy for MCP (Model Context Protocol)**
+<h1 align="center">🛡️ MCP Firewall</h1>
+<p align="center"><strong>Security & Observability Proxy for Model Context Protocol</strong></p>
+<p align="center">6-layer defense-in-depth. Blocks dangerous tool calls before they reach your filesystem, database, or network.</p>
 
-MCP Firewall sits between your AI client and MCP servers, providing a **security pipeline** (RBAC, rate limiting, content filtering, sensitive data detection) and **full observability** (metrics, tracing, audit logging, token tracking) — all in a single TypeScript-native, MIT-licensed proxy.
+---
+
+## Why?
+
+When you give an AI access to MCP servers (filesystem, database, GitHub, etc.), **every tool call is a potential risk**. MCP Firewall sits as a transparent proxy between your AI client and MCP servers, inspecting every request through 6 security layers:
+
+```
+AI Client ──→ MCP Firewall ──→ MCP Server
+                │
+                ├─ ① Method Allowlist      Only known MCP methods pass
+                ├─ ② Authentication        API key / JWT validation
+                ├─ ③ RBAC                  Role-based access control
+                ├─ ④ Rate Limiting         Sliding-window throttling
+                ├─ ⑤ Parameter Validation  Injection & traversal detection
+                └─ ⑥ Content Filter        Sensitive data masking & blocking
+```
 
 ## Quick Start
 
 ```bash
-# Install globally
-npm install -g @mcp-firewall/cli
-
-# Generate a config file
+npm install -g @ziwansi/mcp-firewall
 mcp-firewall init
-
-# Start the firewall (stdio mode — works as Claude Desktop child process)
 mcp-firewall run mcp-firewall.yaml
 ```
 
-### Claude Desktop Integration
+### Claude Desktop
 
 ```json
 {
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@mcp-firewall/cli", "run", "./mcp-firewall.yaml"]
+      "args": ["-y", "@ziwansi/mcp-firewall", "run", "./mcp-firewall.yaml"]
     }
   }
 }
 ```
 
-The firewall transparently proxies all MCP traffic while applying security policies and collecting metrics.
+## What It Blocks
 
-## Features
+| Threat | Layer | Action |
+|---|---|---|
+| Unauthorized file writes | RBAC (default deny) | 🚫 Block |
+| Path traversal (`../../../etc/passwd`) | Parameter Validation | 🚫 Block |
+| Command injection (`$(rm -rf /)`, backtick subshell) | Parameter Validation (14 patterns) | 🚫 Block |
+| Credential file access (`.env`, `.npmrc`, `id_rsa`) | Content Filter | 🚫 Block |
+| API key leaks (GitHub, OpenAI, AWS) | Sensitive Data (8 detectors) | 🔒 Mask |
+| Private key exposure (`-----BEGIN RSA PRIVATE KEY-----`) | Sensitive Data | 🚫 Block |
+| Database connection strings in output | Sensitive Data | 🚫 Block |
+| JWT token leakage | Sensitive Data | 🔒 Mask |
+| Rate limit abuse | Rate Limiting | ⏱️ Throttle |
 
-### Security Pipeline
-- **Method Allowlist** — Block unknown MCP methods
-- **API Key Authentication** — Validate API keys in stdio or HTTP mode
-- **RBAC** — Tool-level access control with glob pattern matching
-- **Rate Limiting** — Sliding window rate limits per client/tool/server
-- **Parameter Validation** — Block path traversal, null byte injection, deep nesting
-- **Content Filtering** — Regex-based input/output filtering
-- **Sensitive Data Detection** — Mask or block PII, API keys, JWT tokens in responses
+## Dashboard
 
-### Observability
-- **Prometheus Metrics** — Request volume, latency, error rates, token usage
-- **Distributed Tracing** — OpenTelemetry traces with W3C context propagation
-- **Audit Logging** — Structured JSON audit trail for every request/response
-- **Token Tracking** — Estimate or extract actual token consumption
-- **Health Checks** — Periodic upstream server health monitoring
+```bash
+mcp-firewall dashboard
+# → http://localhost:9021
+```
+
+Real-time monitoring with SSE streaming, request statistics, security layer status, and audit log filtering.
+
+## CLI
+
+| Command | Description |
+|---|---|
+| `mcp-firewall run <config>` | Start the firewall proxy |
+| `mcp-firewall init [--preset readonly\|full]` | Generate config file |
+| `mcp-firewall validate <config>` | Validate config |
+| `mcp-firewall dashboard` | Real-time monitoring UI |
+| `mcp-firewall status [config]` | Firewall health |
+| `mcp-firewall logs --config <path>` | Tail audit log |
 
 ## Configuration
 
-See [examples/basic-config.yaml](examples/basic-config.yaml) for a minimal config, or [examples/production-config.yaml](examples/production-config.yaml) for a production setup.
-
-### Key Config Sections
-
 ```yaml
 version: "1"
-mode: stdio  # or 'http'
+mode: stdio
 
-# Upstream MCP servers
 upstreams:
   - name: filesystem
     transport: stdio
     command: npx
-    args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "/allowed/path"]
 
-# RBAC Rules (optional)
 policies:
+  methodAllowlist:
+    enabled: true
+    allowedMethods: [initialize, ping, tools/list, tools/call]
+    blockUnknown: true
+
   rbac:
     enabled: true
+    defaultDeny: true
     rules:
-      - name: "allow-read-only"
-        principals:
-          - type: client-id
-            pattern: "claude-desktop"
-        targets:
-          - method: "tools/call"
-            toolName: "read_*"
+      - name: "allow-reads"
+        principals: [{ type: "client-id", pattern: "*" }]
+        targets: [{ method: "tools/call", toolName: "read_file" }]
         permission: allow
 
-  # Rate Limiting (optional)
-  rate_limiting:
+  rateLimiting:
     enabled: true
     rules:
-      - name: "per-client"
-        window: "1m"
+      - windowMs: 60000
         maxRequests: 100
-        keyBy: ["client-id"]
 
-  # Sensitive Data Detection
-  sensitive_data:
+  parameterValidation:
+    enabled: true
+
+  contentFilter:
+    enabled: true
+    rules:
+      - pattern: "(\.env|\.git-credentials|id_rsa|secrets)"
+        action: block
+
+  sensitiveData:
     enabled: true
     detectors:
-      - type: credit-card
-        action: mask
       - type: api-key
         action: mask
+      - type: credit-card
+        action: mask
+      - type: jwt
+        action: mask
+      - type: email
+        action: mask
+      - type: phone
+        action: mask
+      - type: ssn
+        action: mask
+      - type: private-key
+        action: block
+      - type: connection-string
+        action: block
 
-# Observability
 observability:
-  metrics:
+  auditLog:
     enabled: true
-    port: 9090
-  audit_log:
-    enabled: true
-    output: stdout
+    output: file
+    file: "./logs/audit.jsonl"
 ```
 
-## Architecture
+Full example: [`configs/filesystem-firewall.yaml`](configs/filesystem-firewall.yaml)
 
-See the full architecture diagram in [docs/architecture.md](docs/architecture.md).
+## Packages
 
-```
-AI Client ──► MCP Firewall ──► MCP Server
-                │
-                ├── Security Pipeline (7 middlewares: allowlist→auth→RBAC→rate→validation→filter→PII)
-                ├── Observability (Prometheus metrics, OTLP tracing, audit logging, token tracking)
-                ├── Plugin System (JS/Wasm plugins for custom security logic)
-                └── Dashboard API (Hono REST API → React SPA)
-```
+| Package | npm | Description |
+|---|---|---|
+| `@ziwansi/mcp-firewall` | [![npm](https://img.shields.io/npm/v/@ziwansi/mcp-firewall)](https://www.npmjs.com/package/@ziwansi/mcp-firewall) | CLI tool |
+| `@ziwansi/mcp-firewall-core` | [![npm](https://img.shields.io/npm/v/@ziwansi/mcp-firewall-core)](https://www.npmjs.com/package/@ziwansi/mcp-firewall-core) | Proxy engine + security pipeline |
+| `@ziwansi/mcp-firewall-config` | [![npm](https://img.shields.io/npm/v/@ziwansi/mcp-firewall-config)](https://www.npmjs.com/package/@ziwansi/mcp-firewall-config) | Zod schemas + YAML loading |
 
-## Documentation
+## Cross-Platform
 
-| Document | Description |
-|----------|-------------|
-| [Configuration Guide](docs/configuration.md) | All config options, defaults, and examples |
-| [Deployment Guide](docs/deployment.md) | Claude Desktop, HTTP server, Docker, K8s |
-| [Plugin Development](docs/plugin-development.md) | Build custom security plugins |
-| [Architecture](docs/architecture.md) | System design, data flow, package structure |
-
-## Deployment Modes
-
-### Mode A: Sidecar (stdio) — Claude Desktop
-
-```json
-{
-  "mcpServers": {
-    "filesystem": {
-      "command": "node",
-      "args": ["apps/proxy/dist/index.js", "run", "mcp-firewall.yaml"]
-    }
-  }
-}
-```
-
-### Mode B: Team Server (HTTP)
-
-```bash
-docker compose -f examples/docker-compose.e2e.yml up -d
-```
-
-Launches: Firewall + Prometheus + Grafana (pre-built dashboards) + Jaeger + traffic generator.
-
-### Mode C: Kubernetes
-
-Deploy as a sidecar or standalone deployment with Prometheus ServiceMonitor. See [deployment guide](docs/deployment.md).
-
-## Project Status
-
-> **Phase 1 (Foundation)** — ✅ Complete
-> - [x] Monorepo with pnpm + Turborepo + TypeScript strict
-> - [x] Core proxy engine (stdio + HTTP + SSE transports, CORS support)
-> - [x] Security pipeline (method allowlist, API key/JWT auth, RBAC, rate limiting, parameter validation with AJV, content filter, sensitive data detection)
-> - [x] Observability (Prometheus metrics, OpenTelemetry tracing, audit logging, token tracking, health checks)
-> - [x] CLI (run, init, validate, dashboard)
-> - [x] Configuration system (YAML/JSON, Zod validation, env var interpolation, hot-reload)
-> - [x] Plugin system (JS plugin loader, lifecycle management)
-> - [x] Docker sandbox execution (Docker-based, opt-in)
-> - [x] 73 unit tests across 7 security middlewares, 10 test files
-
-> **Phase 2 (Security Core)** — ✅ Complete
-> - [x] JSON Schema parameter validation (AJV integration + ToolSchemaCache)
-> - [x] JWT/OAuth2 authentication (JWKS-based, issuer/audience/expiration checks)
-> - [x] Docker sandbox execution (network isolation, resource limits, timeout)
-> - [x] Plugin system (dynamic import, lifecycle hooks, custom metrics)
-
-> **Phase 3 (Observability)** — ✅ Complete
-> - [x] Database layer (SQLite via Drizzle ORM + better-sqlite3)
-> - [x] Audit log repository with filtering, pagination, stats
-> - [x] Grafana dashboard templates (10 panels, 3 sections)
-> - [x] Docker Compose full stack (firewall + Prometheus + Grafana + Jaeger)
-> - [x] E2E verified: 24 requests, 6 blocked, <1ms latency
-
-> **Phase 4 (Dashboard)** — 📋 Planned
-> - [ ] React SPA dashboard with real-time metrics
-> - [ ] Policy management UI (YAML editor + live validation)
-> - [ ] Audit log viewer (table + filtering + detail)
-
-## Live Demo
-
-```
-git clone https://github.com/mcp-firewall/mcp-firewall
-cd mcp-firewall
-pnpm install && pnpm run build
-
-# Start mock MCP server + firewall + playground
-node tests/fixtures/mock-mcp-http.js &
-node apps/proxy/dist/index.js run examples/docker-firewall-config.yaml &
-
-# Open in browser
-open examples/playground.html
-```
-
-Firewall runs on `:9020` with Prometheus metrics on `:9090`. The playground lets you send safe/blocked requests and watch metrics update in real-time.
+Works on **Windows**, **macOS**, and **Linux**. Zero native dependencies. Requires Node.js ≥ 18.
 
 ## License
 
-MIT © 2026 MCP Firewall Contributors
+MIT © [ziwansi](https://github.com/plzbeavailable)
+
+---
+
+<p align="center">
+  <sub>⭐ Star this repo if you find it useful | PRs welcome</sub>
+</p>

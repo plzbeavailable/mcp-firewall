@@ -1,3 +1,10 @@
+<p align="center">
+  <img src="https://img.shields.io/npm/v/@ziwansi/mcp-firewall?color=58a6ff" alt="version">
+  <img src="https://img.shields.io/npm/dm/@ziwansi/mcp-firewall?color=3fb950" alt="downloads">
+  <img src="https://img.shields.io/github/license/plzbeavailable/mcp-firewall?color=a371f7" alt="license">
+  <img src="https://img.shields.io/badge/platform-windows%20%7C%20macos%20%7C%20linux-lightgrey" alt="platform">
+</p>
+
 # 🛡️ MCP Firewall
 
 **Security & Observability proxy for MCP (Model Context Protocol)**
