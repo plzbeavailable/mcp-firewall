@@ -54,11 +54,18 @@ export {
   ToolSchemaCache,
   ContentFilterMiddleware,
   SensitiveDataMiddleware,
+  IpAccessMiddleware,
+  ResponseLimiterMiddleware,
+  ConcurrencyLimiterMiddleware,
+  ReplayDetectorMiddleware,
+  ThreatScorerMiddleware,
   type ApiKeyEntry,
   type JwtAuthOptions,
   type ParameterValidationOptions,
   type ContentFilterRuleDef,
   type SensitiveDataRule,
+  type ThreatScorerWeights,
+  type ThreatScoreBreakdown,
 } from './security';
 
 // Policy

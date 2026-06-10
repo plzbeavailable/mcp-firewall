@@ -346,6 +346,14 @@ export class MCPFirewall {
     // Run response pipeline
     const result = await pipeline.evaluateResponse(ctxWithResponse);
 
+    // Release concurrency slot
+    const concurrencyLimiter = this.policyEngine.getConcurrencyLimiter();
+    if (concurrencyLimiter) {
+      const clientKey = (ctx.metadata['_concurrencyClientKey'] as string) ?? ctx.client.clientId;
+      const toolKey = (ctx.metadata['_concurrencyToolKey'] as string) ?? ctx.method;
+      concurrencyLimiter.release(clientKey, toolKey);
+    }
+
     if (result.verdict === 'block') {
       this.metrics.counterIncrement('mcp_blocks_total', {
         reason: result.blockDecision?.reason ?? 'unknown',

@@ -1,6 +1,6 @@
 {
   "name": "@ziwansi/mcp-firewall",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "MCP Firewall CLI — Security & Observability proxy for MCP (Model Context Protocol)",
   "license": "MIT",
   "author": "ziwansi",
@@ -36,8 +36,8 @@
     "clean": "rm -rf dist .tsbuildinfo"
   },
   "dependencies": {
-    "@ziwansi/mcp-firewall-core": "^0.1.0",
-    "@ziwansi/mcp-firewall-config": "^0.1.0",
+    "@ziwansi/mcp-firewall-core": "^0.1.2",
+    "@ziwansi/mcp-firewall-config": "^0.1.2",
     "citty": "^0.1.6"
   },
   "devDependencies": {

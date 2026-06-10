@@ -190,8 +190,80 @@ export const PolicyConfig = z.object({
       detectors: z.array(SensitiveDataDetector).default([]),
     })
     .default({}),
+  ipAccess: z
+    .object({
+      enabled: z.boolean().default(false),
+      allowlist: z.array(z.string()).default([]),
+      blocklist: z.array(z.string()).default([]),
+      /** Block by default when only allowlist is configured (default: true) */
+      defaultDeny: z.boolean().default(true),
+      /** Enable geolocation-based blocking (requires GeoIP database) */
+      geoBlock: z.array(z.string()).default([]),
+    })
+    .default({}),
+  responseLimits: z
+    .object({
+      enabled: z.boolean().default(false),
+      /** Maximum response size in bytes (default: 10 MB) */
+      maxResponseSize: z.number().int().positive().default(10_485_760),
+      /** Max number of items in a list result (default: 1000) */
+      maxItems: z.number().int().positive().default(1000),
+      /** Max nesting depth of response objects (default: 20) */
+      maxResponseDepth: z.number().int().min(1).max(100).default(20),
+    })
+    .default({}),
+  concurrencyLimit: z
+    .object({
+      enabled: z.boolean().default(false),
+      /** Max concurrent requests per client (default: 10) */
+      maxConcurrent: z.number().int().positive().default(10),
+      /** Max concurrent requests per tool (default: 50) */
+      maxConcurrentPerTool: z.number().int().positive().default(50),
+      /** Queue excess requests instead of rejecting (default: false) */
+      queueEnabled: z.boolean().default(false),
+      /** Max queue size per client (default: 100) */
+      maxQueueSize: z.number().int().positive().default(100),
+    })
+    .default({}),
+  replayDetection: z
+    .object({
+      enabled: z.boolean().default(false),
+      /** Nonce TTL in seconds (default: 300 = 5 minutes) */
+      nonceTtlSeconds: z.number().int().positive().default(300),
+      /** Max clock skew in seconds for timestamp validation (default: 30) */
+      maxClockSkew: z.number().int().min(0).default(30),
+      /** Require nonce in every tools/call request */
+      requireNonce: z.boolean().default(true),
+    })
+    .default({}),
+  threatScoring: z
+    .object({
+      enabled: z.boolean().default(false),
+      /** Score at which the request is blocked (default: 80 out of 100) */
+      blockThreshold: z.number().int().min(1).max(100).default(80),
+      /** Score at which a warning is issued (default: 50) */
+      warnThreshold: z.number().int().min(1).max(100).default(50),
+      /** Weight for each security layer in the aggregate score */
+      weights: z
+        .object({
+          injectionDetection: z.number().min(0).max(1).default(0.3),
+          rateLimiting: z.number().min(0).max(1).default(0.15),
+          contentFilter: z.number().min(0).max(1).default(0.25),
+          ipReputation: z.number().min(0).max(1).default(0.1),
+          replayDetection: z.number().min(0).max(1).default(0.1),
+          concurrency: z.number().min(0).max(1).default(0.1),
+        })
+        .default({}),
+    })
+    .default({}),
 });
 export type PolicyConfig = z.infer<typeof PolicyConfig>;
+// Convenience type aliases for sub-configs
+export type IpAccessConfig = PolicyConfig['ipAccess'];
+export type ResponseLimitsConfig = PolicyConfig['responseLimits'];
+export type ConcurrencyLimitConfig = PolicyConfig['concurrencyLimit'];
+export type ReplayDetectionConfig = PolicyConfig['replayDetection'];
+export type ThreatScoringConfig = PolicyConfig['threatScoring'];
 
 // ─── Observability config ──────────────────────────────────────
 

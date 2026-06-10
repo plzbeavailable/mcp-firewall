@@ -1,6 +1,6 @@
 {
   "name": "@ziwansi/mcp-firewall-config",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Configuration system for MCP Firewall — Zod schemas, YAML loading, hot-reload",
   "license": "MIT",
   "author": "ziwansi",

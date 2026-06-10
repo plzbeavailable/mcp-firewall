@@ -9,7 +9,7 @@
 
 **Security & Observability proxy for MCP (Model Context Protocol)**
 
-MCP Firewall sits between your AI client and MCP servers, providing defense-in-depth security with 6 protection layers — before any tool call reaches your filesystem or database.
+MCP Firewall sits between your AI client and MCP servers, providing defense-in-depth security with 11 protection layers and 108 injection detection patterns — before any tool call reaches your filesystem or database.
 
 ## Installation
 

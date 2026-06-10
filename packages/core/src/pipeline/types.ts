@@ -39,7 +39,7 @@ export interface SecurityEvent {
   /** Which middleware produced this event */
   middleware: string;
   /** Event category */
-  category: 'auth' | 'rbac' | 'rate-limit' | 'validation' | 'content-filter' | 'sensitive-data' | 'sandbox';
+  category: 'auth' | 'rbac' | 'rate-limit' | 'validation' | 'content-filter' | 'sensitive-data' | 'sandbox' | 'ip-access' | 'response-limit' | 'concurrency' | 'replay' | 'threat';
   /** Human-readable description */
   message: string;
   /** Severity */

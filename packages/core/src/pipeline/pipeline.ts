@@ -151,6 +151,11 @@ export class Pipeline {
     if (lower.includes('content') || lower.includes('filter')) return 'content-filter';
     if (lower.includes('sensitive') || lower.includes('pii') || lower.includes('secret')) return 'sensitive-data';
     if (lower.includes('sandbox')) return 'sandbox';
+    if (lower.includes('ip')) return 'ip-access';
+    if (lower.includes('response') && lower.includes('limit')) return 'response-limit';
+    if (lower.includes('concurrency')) return 'concurrency';
+    if (lower.includes('replay')) return 'replay';
+    if (lower.includes('threat')) return 'threat';
     return 'validation';
   }
 }

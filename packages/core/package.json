@@ -1,6 +1,6 @@
 {
   "name": "@ziwansi/mcp-firewall-core",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Core proxy engine, security pipeline, and observability for MCP Firewall",
   "license": "MIT",
   "author": "ziwansi",
@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.0.4",
-    "@ziwansi/mcp-firewall-config": "^0.1.0",
+    "@ziwansi/mcp-firewall-config": "^0.1.2",
     "@modelcontextprotocol/sdk": "^1.9.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1"

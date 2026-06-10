@@ -6,6 +6,11 @@ import { RateLimiterMiddleware } from '../security/rate-limiter';
 import { ParameterValidationMiddleware, ToolSchemaCache } from '../security/parameter-validator';
 import { ContentFilterMiddleware } from '../security/content-filter';
 import { SensitiveDataMiddleware } from '../security/sensitive-data';
+import { IpAccessMiddleware } from '../security/ip-access';
+import { ResponseLimiterMiddleware } from '../security/response-limiter';
+import { ConcurrencyLimiterMiddleware } from '../security/concurrency-limiter';
+import { ReplayDetectorMiddleware } from '../security/replay-detector';
+import { ThreatScorerMiddleware } from '../security/threat-scorer';
 import { Pipeline } from '../pipeline/pipeline';
 
 /**
@@ -18,6 +23,10 @@ export class PolicyEngine {
   private pipeline: Pipeline;
   private rateLimiter: RateLimiterMiddleware | null = null;
   private sensitiveData: SensitiveDataMiddleware | null = null;
+  private concurrencyLimiter: ConcurrencyLimiterMiddleware | null = null;
+  private replayDetector: ReplayDetectorMiddleware | null = null;
+  private responseLimiter: ResponseLimiterMiddleware | null = null;
+  private threatScorer: ThreatScorerMiddleware | null = null;
   private toolSchemaCache: ToolSchemaCache;
 
   constructor(config: FirewallConfig, toolSchemaCache?: ToolSchemaCache) {
@@ -41,6 +50,10 @@ export class PolicyEngine {
     // Clean up old rate limiter
     if (this.rateLimiter) {
       this.rateLimiter.destroy();
+    }
+    // Clean up old replay detector
+    if (this.replayDetector) {
+      this.replayDetector.destroy();
     }
 
     const newPipeline = new Pipeline();
@@ -69,12 +82,57 @@ export class PolicyEngine {
     return this.sensitiveData;
   }
 
+  /**
+   * Get the concurrency limiter for stats and release (may be null).
+   */
+  getConcurrencyLimiter(): ConcurrencyLimiterMiddleware | null {
+    return this.concurrencyLimiter;
+  }
+
+  /**
+   * Get the response limiter for stats queries (may be null).
+   */
+  getResponseLimiter(): ResponseLimiterMiddleware | null {
+    return this.responseLimiter;
+  }
+
+  /**
+   * Get the threat scorer for stats queries (may be null).
+   */
+  getThreatScorer(): ThreatScorerMiddleware | null {
+    return this.threatScorer;
+  }
+
   private compile(config: FirewallConfig): void {
     this.compileInto(config, this.pipeline);
   }
 
   private compileInto(config: FirewallConfig, pipeline: Pipeline): void {
     const policies = config.policies;
+
+    // 0. IP Access Control (priority 5)
+    if (policies.ipAccess.enabled) {
+      pipeline.register(
+        new IpAccessMiddleware({
+          enabled: policies.ipAccess.enabled,
+          allowlist: policies.ipAccess.allowlist,
+          blocklist: policies.ipAccess.blocklist,
+          defaultDeny: policies.ipAccess.defaultDeny,
+          geoBlock: policies.ipAccess.geoBlock,
+        }),
+      );
+    }
+
+    // 0b. Replay Detection (priority 8)
+    if (policies.replayDetection.enabled) {
+      this.replayDetector = new ReplayDetectorMiddleware({
+        enabled: policies.replayDetection.enabled,
+        nonceTtlSeconds: policies.replayDetection.nonceTtlSeconds,
+        maxClockSkew: policies.replayDetection.maxClockSkew,
+        requireNonce: policies.replayDetection.requireNonce,
+      });
+      pipeline.register(this.replayDetector);
+    }
 
     // 1. Method Allowlist (priority 10)
     if (policies.methodAllowlist.enabled) {
@@ -103,13 +161,25 @@ export class PolicyEngine {
       pipeline.register(new RbacMiddleware(policies.rbac.rules, !policies.rbac.defaultDeny));
     }
 
-    // 4. Rate Limiting (priority 40)
+    // 4. Concurrency Limiter (priority 35)
+    if (policies.concurrencyLimit.enabled) {
+      this.concurrencyLimiter = new ConcurrencyLimiterMiddleware({
+        enabled: policies.concurrencyLimit.enabled,
+        maxConcurrent: policies.concurrencyLimit.maxConcurrent,
+        maxConcurrentPerTool: policies.concurrencyLimit.maxConcurrentPerTool,
+        queueEnabled: policies.concurrencyLimit.queueEnabled,
+        maxQueueSize: policies.concurrencyLimit.maxQueueSize,
+      });
+      pipeline.register(this.concurrencyLimiter);
+    }
+
+    // 5. Rate Limiting (priority 40)
     if (policies.rateLimiting.enabled && policies.rateLimiting.rules.length > 0) {
       this.rateLimiter = new RateLimiterMiddleware(policies.rateLimiting.rules);
       pipeline.register(this.rateLimiter);
     }
 
-    // 5. Parameter Validation (priority 50)
+    // 6. Parameter Validation (priority 50)
     if (policies.parameterValidation.enabled) {
       pipeline.register(
         new ParameterValidationMiddleware({
@@ -121,7 +191,7 @@ export class PolicyEngine {
       );
     }
 
-    // 6. Content Filter (priority 60)
+    // 7. Content Filter (priority 60)
     if (policies.contentFilter.enabled && policies.contentFilter.rules.length > 0) {
       pipeline.register(
         new ContentFilterMiddleware(
@@ -134,7 +204,18 @@ export class PolicyEngine {
       );
     }
 
-    // 7. Sensitive Data Detection (priority 120 — response phase)
+    // 8. Response Limiter (priority 110 — response phase)
+    if (policies.responseLimits.enabled) {
+      this.responseLimiter = new ResponseLimiterMiddleware({
+        enabled: policies.responseLimits.enabled,
+        maxResponseSize: policies.responseLimits.maxResponseSize,
+        maxItems: policies.responseLimits.maxItems,
+        maxResponseDepth: policies.responseLimits.maxResponseDepth,
+      });
+      pipeline.register(this.responseLimiter);
+    }
+
+    // 9. Sensitive Data Detection (priority 120 — response phase)
     if (policies.sensitiveData.enabled && policies.sensitiveData.detectors.length > 0) {
       this.sensitiveData = new SensitiveDataMiddleware(
         policies.sensitiveData.detectors.map((d) => ({
@@ -145,6 +226,17 @@ export class PolicyEngine {
         })),
       );
       pipeline.register(this.sensitiveData);
+    }
+
+    // 10. Threat Scoring (priority 199 — runs last, aggregates all layers)
+    if (policies.threatScoring.enabled) {
+      this.threatScorer = new ThreatScorerMiddleware({
+        enabled: policies.threatScoring.enabled,
+        blockThreshold: policies.threatScoring.blockThreshold,
+        warnThreshold: policies.threatScoring.warnThreshold,
+        weights: policies.threatScoring.weights,
+      });
+      pipeline.register(this.threatScorer);
     }
   }
 }

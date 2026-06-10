@@ -65,6 +65,45 @@ export const DEFAULT_CONFIG: Partial<FirewallConfig> = {
         { type: 'connection-string', action: 'block' },
       ],
     },
+    ipAccess: {
+      enabled: false,
+      allowlist: [],
+      blocklist: [],
+      defaultDeny: true,
+      geoBlock: [],
+    },
+    responseLimits: {
+      enabled: false,
+      maxResponseSize: 10_485_760,
+      maxItems: 1000,
+      maxResponseDepth: 20,
+    },
+    concurrencyLimit: {
+      enabled: false,
+      maxConcurrent: 10,
+      maxConcurrentPerTool: 50,
+      queueEnabled: false,
+      maxQueueSize: 100,
+    },
+    replayDetection: {
+      enabled: false,
+      nonceTtlSeconds: 300,
+      maxClockSkew: 30,
+      requireNonce: true,
+    },
+    threatScoring: {
+      enabled: false,
+      blockThreshold: 80,
+      warnThreshold: 50,
+      weights: {
+        injectionDetection: 0.3,
+        rateLimiting: 0.15,
+        contentFilter: 0.25,
+        ipReputation: 0.1,
+        replayDetection: 0.1,
+        concurrency: 0.1,
+      },
+    },
   },
   observability: {
     metrics: {

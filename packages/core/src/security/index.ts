@@ -7,3 +7,8 @@ export { ParameterValidationMiddleware, ToolSchemaCache, type ParameterValidatio
 export { ContentFilterMiddleware, type ContentFilterRuleDef } from './content-filter';
 export { SensitiveDataMiddleware, type SensitiveDataRule } from './sensitive-data';
 export { SandboxMiddleware, type SandboxConfig, type SandboxResult } from './sandbox';
+export { IpAccessMiddleware } from './ip-access';
+export { ResponseLimiterMiddleware } from './response-limiter';
+export { ConcurrencyLimiterMiddleware } from './concurrency-limiter';
+export { ReplayDetectorMiddleware } from './replay-detector';
+export { ThreatScorerMiddleware, type ThreatScorerWeights, type ThreatScoreBreakdown } from './threat-scorer';
